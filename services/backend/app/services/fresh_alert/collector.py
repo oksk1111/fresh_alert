@@ -44,6 +44,8 @@ class MafraCollector:
 
     def __init__(self, api_key: str) -> None:
         self.api_key = api_key
+        self._is_sample = api_key == "sample"
+        self._page_size = 5 if self._is_sample else 1000
         self.client = httpx.AsyncClient(timeout=30.0)
 
     async def _fetch(
@@ -57,6 +59,7 @@ class MafraCollector:
 
         Builds the URL using the grid_id and pagination range, appends any
         extra query parameters, and returns the 'row' list from the response.
+        Handles pagination automatically for sample key (max 5 per request).
 
         Args:
             grid_id: The MAFRA grid identifier for the target dataset.
@@ -67,35 +70,57 @@ class MafraCollector:
         Returns:
             List of row dicts from the API response, or empty list on error.
         """
-        url = f"{MAFRA_BASE_URL}/{self.api_key}/json/{grid_id}/{start}/{end}"
+        all_rows: list[dict[str, Any]] = []
+        page_start = start
+        page_size = self._page_size
+        max_end = end
 
-        try:
-            response = await self.client.get(url, params=params)
-            response.raise_for_status()
-            data = response.json()
+        while page_start <= max_end:
+            page_end = min(page_start + page_size - 1, max_end)
+            url = f"{MAFRA_BASE_URL}/{self.api_key}/json/{grid_id}/{page_start}/{page_end}"
 
-            # MAFRA API wraps results under the grid_id key
-            grid_data = data.get(grid_id)
-            if grid_data is None:
-                logger.warning("No grid data found in response for %s", grid_id)
-                return []
+            try:
+                response = await self.client.get(url, params=params)
+                response.raise_for_status()
+                data = response.json()
 
-            return grid_data.get("row", [])
+                # MAFRA API wraps results under the grid_id key
+                grid_data = data.get(grid_id)
+                if grid_data is None:
+                    # Check if it's an auth error
+                    result = data.get("result", {})
+                    if result.get("code") == "INFO-100":
+                        logger.error("MAFRA API key invalid: %s", result.get("message"))
+                    else:
+                        logger.warning("No grid data in response for %s", grid_id)
+                    return all_rows
 
-        except httpx.HTTPStatusError as exc:
-            logger.error(
-                "HTTP %d from MAFRA API (grid=%s): %s",
-                exc.response.status_code,
-                grid_id,
-                exc.response.text[:200],
-            )
-            return []
-        except httpx.RequestError as exc:
-            logger.error("Request error for MAFRA API (grid=%s): %s", grid_id, exc)
-            return []
-        except (KeyError, ValueError) as exc:
-            logger.error("Failed to parse MAFRA response (grid=%s): %s", grid_id, exc)
-            return []
+                rows = grid_data.get("row", [])
+                all_rows.extend(rows)
+
+                # If we got fewer results than page size, no more data
+                total_cnt = grid_data.get("totalCnt", 0)
+                if len(rows) < page_size or page_end >= total_cnt:
+                    break
+
+                page_start = page_end + 1
+
+            except httpx.HTTPStatusError as exc:
+                logger.error(
+                    "HTTP %d from MAFRA API (grid=%s): %s",
+                    exc.response.status_code,
+                    grid_id,
+                    exc.response.text[:200],
+                )
+                break
+            except httpx.RequestError as exc:
+                logger.error("Request error for MAFRA API (grid=%s): %s", grid_id, exc)
+                break
+            except (KeyError, ValueError) as exc:
+                logger.error("Failed to parse MAFRA response (grid=%s): %s", grid_id, exc)
+                break
+
+        return all_rows
 
     async def fetch_realtime_auction(
         self,
@@ -164,13 +189,13 @@ class MafraCollector:
         Returns:
             List of item volume record dicts.
         """
-        params: dict[str, str] = {"REGISTDATE": regist_date}
+        params: dict[str, str] = {"REGIST_DT": regist_date}
         if market_code is not None:
             params["WHSALCD"] = market_code
         if large is not None:
-            params["LARGECD"] = large
+            params["LARGE"] = large
         if mid is not None:
-            params["MIDCD"] = mid
+            params["MID"] = mid
 
         return await self._fetch(MARKET_ITEM_VOLUME, 1, 1000, params)
 
@@ -188,7 +213,7 @@ class MafraCollector:
         Returns:
             List of total volume record dicts.
         """
-        params: dict[str, str] = {"REGISTDATE": regist_date}
+        params: dict[str, str] = {"REGIST_DT": regist_date}
         if market_code is not None:
             params["WHSALCD"] = market_code
 

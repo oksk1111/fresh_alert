@@ -354,6 +354,39 @@ def get_season_calendar() -> FreshAlertEnvelope:
     return FreshAlertEnvelope(data=calendar)
 
 
+# ─── 파이프라인 (관리용) ──────────────────────────────────────────────────────
+
+
+@router.post("/pipeline/run")
+async def run_pipeline(
+    date: str = Query(default=None, description="처리 날짜 (YYYYMMDD)"),
+) -> FreshAlertEnvelope:
+    """데이터 수집 파이프라인을 수동 실행한다."""
+    from app.services.fresh_alert.pipeline import run_full_pipeline
+    result = await run_full_pipeline(date)
+    return FreshAlertEnvelope(data=result)
+
+
+@router.post("/pipeline/collect-kamis")
+async def collect_kamis(
+    date: str = Query(default=None, description="조회 날짜 (YYYY-MM-DD)"),
+) -> FreshAlertEnvelope:
+    """KAMIS 소매가격을 수동 수집한다."""
+    from app.services.fresh_alert.pipeline import step_collect_kamis_prices
+    result = await step_collect_kamis_prices(date)
+    return FreshAlertEnvelope(data=result)
+
+
+@router.post("/pipeline/collect-mafra")
+async def collect_mafra(
+    date: str = Query(default=None, description="정산일자 (YYYYMMDD)"),
+) -> FreshAlertEnvelope:
+    """MAFRA 도매가격을 수동 수집한다."""
+    from app.services.fresh_alert.pipeline import step_collect_mafra_prices
+    result = await step_collect_mafra_prices(date)
+    return FreshAlertEnvelope(data=result)
+
+
 # ─── 내부 헬퍼 ──────────────────────────────────────────────────────────────
 
 
