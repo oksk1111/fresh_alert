@@ -812,7 +812,9 @@ button {
 .mobile-app {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   background: #fafafa;
 }
 
@@ -887,7 +889,8 @@ button {
 .mobile-app-content {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 16px calc(16px + 76px);
 }
 
 .mobile-app-loading,
@@ -916,6 +919,7 @@ button {
 
 .mobile-app-card.unread {
   border-left: 3px solid #2E7D32;
+  cursor: pointer;
 }
 
 .mobile-app-rank {
@@ -994,8 +998,11 @@ button {
   background: #fff;
   border-top: 1px solid #e8e8e8;
   padding: 12px 0 20px;
-  position: sticky;
+  position: fixed;
+  left: 0;
+  right: 0;
   bottom: 0;
+  z-index: 20;
 }
 
 .mobile-app-nav-item {
@@ -1006,6 +1013,11 @@ button {
   gap: 3px;
   color: #bbb;
   font-size: 20px;
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  position: relative;
 }
 
 .mobile-app-nav-item small {
@@ -1015,4 +1027,87 @@ button {
 
 .mobile-app-nav-item.active {
   color: #2E7D32;
+}
+
+.mobile-app-nav-dot {
+  position: absolute;
+  top: -2px;
+  right: calc(50% - 14px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #D32F2F;
+}
+
+/* ─── 검색 화면 ────────────────────────────────────────────────────────────── */
+
+.mobile-app-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 15px;
+  font-family: inherit;
+  margin-bottom: 14px;
+  outline: none;
+}
+
+.mobile-app-search-input:focus {
+  border-color: #2E7D32;
+}
+
+/* ─── 내 정보 화면 ──────────────────────────────────────────────────────────── */
+
+.mobile-app-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.mobile-app-profile-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #E8F5E9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  margin-bottom: 12px;
+}
+
+.mobile-app-profile-name {
+  font-size: 17px;
+  color: #1a1a1a;
+  margin-bottom: 24px;
+}
+
+.mobile-app-profile-stats {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+}
+
+.mobile-app-profile-stat {
+  flex: 1;
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.mobile-app-profile-stat b {
+  display: block;
+  font-size: 20px;
+  color: #2E7D32;
+}
+
+.mobile-app-profile-stat span {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #888;
 }
