@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"
+const API_URL = import.meta.env.VITE_API_URL || "http://134.185.117.248:8000/api/v1"
 
 export async function fetcher<T>(
   path: string,

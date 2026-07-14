@@ -3,6 +3,7 @@ import { fetchNotifications, fetchKeywords, fetchRecommendations } from "../api/
 import type { Notification, KeywordSubscription, DailyRecommendation } from "../api/freshAlert";
 
 type AlertTab = "recommend" | "keyword" | "category";
+type BottomNavTab = "home" | "search" | "notifications" | "profile";
 
 const TAB_CONFIG: { key: AlertTab; label: string; icon: string; color: string }[] = [
   { key: "recommend", label: "추천", icon: "🎯", color: "#2E7D32" },
@@ -36,6 +37,7 @@ function getFoodIcon(name: string): string {
 
 export default function MobileAlertView() {
   const [activeTab, setActiveTab] = useState<AlertTab>("recommend");
+  const [bottomActiveTab, setBottomActiveTab] = useState<BottomNavTab>("home");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [keywords, setKeywords] = useState<KeywordSubscription[]>([]);
   const [recommendations, setRecommendations] = useState<DailyRecommendation | null>(null);
@@ -164,19 +166,39 @@ export default function MobileAlertView() {
 
       {/* Bottom nav */}
       <nav className="mobile-app-bottom-nav">
-        <div className="mobile-app-nav-item active">
+        <div
+          className={`mobile-app-nav-item${bottomActiveTab === "home" ? " active" : ""}`}
+          onClick={() => setBottomActiveTab("home")}
+          role="button"
+          tabIndex={0}
+        >
           <span>🏠</span>
           <small>홈</small>
         </div>
-        <div className="mobile-app-nav-item">
+        <div
+          className={`mobile-app-nav-item${bottomActiveTab === "search" ? " active" : ""}`}
+          onClick={() => setBottomActiveTab("search")}
+          role="button"
+          tabIndex={0}
+        >
           <span>🔍</span>
           <small>검색</small>
         </div>
-        <div className="mobile-app-nav-item">
+        <div
+          className={`mobile-app-nav-item${bottomActiveTab === "notifications" ? " active" : ""}`}
+          onClick={() => setBottomActiveTab("notifications")}
+          role="button"
+          tabIndex={0}
+        >
           <span>🔔</span>
           <small>알림</small>
         </div>
-        <div className="mobile-app-nav-item">
+        <div
+          className={`mobile-app-nav-item${bottomActiveTab === "profile" ? " active" : ""}`}
+          onClick={() => setBottomActiveTab("profile")}
+          role="button"
+          tabIndex={0}
+        >
           <span>👤</span>
           <small>내 정보</small>
         </div>
