@@ -2,9 +2,6 @@
   "version": 2,
   "buildCommand": "npm run web:build",
   "outputDirectory": "apps/web/dist",
-  "env": {
-    "VITE_API_BASE_URL": ""
-  },
   "rewrites": [
     {
       "source": "/api/v1/:path*",
