@@ -55,13 +55,19 @@ export default function App() {
 
   return (
     <div className="page">
+      {/* ─── 모바일 전용: 전체 화면 모바일 UI ─── */}
+      <div className="mobile-only">
+        <MobileAlertView />
+      </div>
+
+      {/* ─── 데스크탑 전용: 기존 대시보드 ─── */}
+      <div className="desktop-only">
       <div className="bg-shape bg-shape-one" />
       <div className="bg-shape bg-shape-two" />
 
       <header className="announcement-bar">
         <span>농가 폐기 0원 수렴을 위한 실시간 수급 오케스트레이션 테스트베드 운영 중</span>
         <nav>
-          <a href="#mobile">모바일 UX</a>
           <a href="#dashboard">B2B 대시보드</a>
           <a href="#fresh-alert">FreshAlert</a>
         </nav>
@@ -79,7 +85,6 @@ export default function App() {
       </div>
 
       <main className="container">
-        <MobileAlertView />
 
         <section className="hero">
           <article>
@@ -203,6 +208,7 @@ export default function App() {
           <button className="btn-primary">파트너십 문의</button>
         </section>
       </main>
+      </div>
     </div>
   );
 }
