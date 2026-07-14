@@ -60,9 +60,9 @@ export default function App() {
       <header className="announcement-bar">
         <span>농가 폐기 0원 수렴을 위한 실시간 수급 오케스트레이션 테스트베드 운영 중</span>
         <nav>
+          <a href="#mobile">모바일 UX</a>
           <a href="#dashboard">B2B 대시보드</a>
           <a href="#fresh-alert">FreshAlert</a>
-          <a href="#mobile">모바일 UX</a>
         </nav>
       </header>
 
@@ -78,6 +78,24 @@ export default function App() {
       </div>
 
       <main className="container">
+        <section className="feature-section" id="mobile">
+          <h2>모듈 시스템 맵</h2>
+          <div className="feature-grid">
+            <div>
+              <h3>Data Ingestion</h3>
+              <p>Airflow 배치 시나리오를 기준으로 공공 데이터를 Feature Store에 동기화</p>
+            </div>
+            <div>
+              <h3>AI Orchestration</h3>
+              <p>TFT 예측과 다목적 추천함수를 결합해 사용자별 장바구니 생성</p>
+            </div>
+            <div>
+              <h3>Execution Layer</h3>
+              <p>동적 할인율, ESG 포인트, VRP 배차 결과를 API로 실시간 전달</p>
+            </div>
+          </div>
+        </section>
+
         <section className="hero">
           <article>
             <h1>
@@ -191,24 +209,6 @@ export default function App() {
         </section>
 
         <FreshAlertSection />
-
-        <section className="feature-section" id="mobile">
-          <h2>모듈 시스템 맵</h2>
-          <div className="feature-grid">
-            <div>
-              <h3>Data Ingestion</h3>
-              <p>Airflow 배치 시나리오를 기준으로 공공 데이터를 Feature Store에 동기화</p>
-            </div>
-            <div>
-              <h3>AI Orchestration</h3>
-              <p>TFT 예측과 다목적 추천함수를 결합해 사용자별 장바구니 생성</p>
-            </div>
-            <div>
-              <h3>Execution Layer</h3>
-              <p>동적 할인율, ESG 포인트, VRP 배차 결과를 API로 실시간 전달</p>
-            </div>
-          </div>
-        </section>
 
         <section className="community-card">
           <div>
