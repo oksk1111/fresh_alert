@@ -41,16 +41,16 @@ export default function App() {
     if (!basket) {
       return {
         items: 0,
-        discountRate: 0,
-        points: 0,
+        totalPrice: 0,
+        routeTime: 0,
       };
     }
     return {
-      items: basket.data.summary.total_items_count,
-      discountRate: Math.round(basket.data.summary.total_discount_rate * 100),
-      points: basket.data.summary.estimated_esg_points,
+      items: basket.data.basket.length,
+      totalPrice: basket.data.basket.reduce((sum, i) => sum + i.avg_price, 0),
+      routeTime: route?.data.estimated_time_mins ?? 0,
     };
-  }, [basket]);
+  }, [basket, route]);
 
   return (
     <div className="page">
@@ -96,16 +96,16 @@ export default function App() {
 
             <div className="stats-row">
               <div className="stats-card stats-highlight">
-                <b>{heroStats.discountRate}%</b>
-                <span>예상 할인율</span>
-              </div>
-              <div className="stats-card">
                 <b>{heroStats.items}</b>
                 <span>추천 품목 수</span>
               </div>
               <div className="stats-card">
-                <b>{heroStats.points}</b>
-                <span>예상 ESG 포인트</span>
+                <b>{formatWon(heroStats.totalPrice)}원</b>
+                <span>총 예상 금액</span>
+              </div>
+              <div className="stats-card">
+                <b>{heroStats.routeTime}분</b>
+                <span>예상 배송 시간</span>
               </div>
             </div>
           </article>
@@ -129,19 +129,18 @@ export default function App() {
             {!loading && basket && (
               <>
                 <p className="module-summary">
-                  예상 원가 {formatWon(basket.data.summary.estimated_original_price)}원 →
-                  할인 후 {formatWon(basket.data.summary.estimated_discounted_price)}원
+                  추천 품목 {basket.data.basket.length}개 · 합계 {formatWon(basket.data.basket.reduce((s, i) => s + i.avg_price, 0))}원
                 </p>
                 <ul className="item-list">
-                  {basket.data.items.map((item) => (
-                    <li key={item.product_code}>
+                  {basket.data.basket.map((item) => (
+                    <li key={item.item_name}>
                       <div>
-                        <strong>{item.product_name}</strong>
-                        <small>{item.nutrition_match_reason}</small>
+                        <strong>{item.item_name}</strong>
+                        <small>{item.category}</small>
                       </div>
                       <div className="price-col">
-                        <span>{formatWon(item.discounted_price)}원</span>
-                        <em>{item.oversupply_risk_level}</em>
+                        <span>{formatWon(item.avg_price)}원</span>
+                        <em>{item.recommend_reason}</em>
                       </div>
                     </li>
                   ))}
@@ -155,21 +154,19 @@ export default function App() {
             {!loading && route && (
               <>
                 <p className="module-summary">
-                  CO2 절감률 {route.data.base_co2_reduction_percentage}%
+                  {route.data.message}
                 </p>
                 <ul className="item-list">
-                  {route.data.optimized_routes.map((item) => (
-                    <li key={item.route_index}>
-                      <div>
-                        <strong>Route {item.route_index}</strong>
-                        <small>{item.path_destination_ids.join(" → ")}</small>
-                      </div>
-                      <div className="price-col">
-                        <span>{Math.round(item.total_distance_meters / 1000)}km</span>
-                        <em>{item.co2_emitted_kg}kg CO2</em>
-                      </div>
-                    </li>
-                  ))}
+                  <li>
+                    <div>
+                      <strong>경로 {route.data.route_id}</strong>
+                      <small>최적 경로</small>
+                    </div>
+                    <div className="price-col">
+                      <span>{route.data.distance_km}km</span>
+                      <em>{route.data.estimated_time_mins}분</em>
+                    </div>
+                  </li>
                 </ul>
               </>
             )}
@@ -179,11 +176,13 @@ export default function App() {
             <h2>14일 수급/가격 예측</h2>
             {!loading && forecast && (
               <div className="forecast-grid">
-                {forecast.data.map((item) => (
-                  <div key={item.product_code} className="forecast-item">
-                    <strong>{item.product_code}</strong>
-                    <span>P50 {formatWon(item.p50_predicted_price)}원</span>
-                    <span>Risk {(item.oversupply_risk_index * 100).toFixed(0)}%</span>
+                {forecast.data.forecasts.map((item) => (
+                  <div key={item.item_name} className="forecast-item">
+                    <strong>{item.item_name}</strong>
+                    <span>다음주 {formatWon(item.next_week_price)}원</span>
+                    <span className={`trend-${item.trend}`}>
+                      {item.trend === "up" ? "▲ 상승" : item.trend === "down" ? "▼ 하락" : "— 보합"}
+                    </span>
                   </div>
                 ))}
               </div>
