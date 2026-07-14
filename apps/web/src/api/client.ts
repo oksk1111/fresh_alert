@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
+// PROD(Vercel): 빈 문자열 → 상대경로 → vercel.json rewrite가 백엔드로 프록시
+// DEV(로컬): http://localhost:8000 직접 접속
+const API_BASE = import.meta.env.PROD ? "" : "http://localhost:8000";
 
 export interface BasketItem {
   item_name: string;
