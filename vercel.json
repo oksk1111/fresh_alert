@@ -1,6 +1,14 @@
 {
   "version": 2,
+  "buildCommand": "npm run web:build",
+  "outputDirectory": "apps/web/dist",
   "env": {
-    "VITE_API_BASE_URL": "http://134.185.117.248:8000"
-  }
+    "VITE_API_BASE_URL": ""
+  },
+  "rewrites": [
+    {
+      "source": "/api/v1/:path*",
+      "destination": "http://134.185.117.248:8000/api/v1/:path*"
+    }
+  ]
 }
