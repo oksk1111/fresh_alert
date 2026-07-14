@@ -10,6 +10,30 @@ const TAB_CONFIG: { key: AlertTab; label: string; icon: string; color: string }[
   { key: "category", label: "분류", icon: "📂", color: "#E65100" },
 ];
 
+const FOOD_ICONS: Record<string, string> = {
+  배추: "🥬", 상추: "🥬", 양배추: "🥬", 시금치: "🥬",
+  사과: "🍎", 감귤: "🍊", 귤: "🍊", 오렌지: "🍊", 포도: "🍇", 배: "🍐", 수박: "🍉", 참외: "🍈", 딸기: "🍓", 복숭아: "🍑", 바나나: "🍌",
+  대파: "🧅", 양파: "🧅", 마늘: "🧄",
+  감자: "🥔", 고구마: "🍠",
+  당근: "🥕",
+  토마토: "🍅",
+  오이: "🥒", 호박: "🥒",
+  고추: "🌶️", 풋고추: "🌶️",
+  버섯: "🍄",
+  쌀: "🌾", 보리: "🌾", 밀: "🌾",
+  고등어: "🐟", 갈치: "🐟", 명태: "🐟", 오징어: "🦑", 새우: "🦐", 굴: "🦪", 조기: "🐟", 꽁치: "🐟", 멸치: "🐟",
+  삼겹살: "🥩", 한우등심: "🥩", 돼지고기: "🥩", 소고기: "🥩", 닭고기: "🍗", 계란: "🥚", 달걀: "🥚",
+  우유: "🥛", 두부: "🧈",
+};
+
+function getFoodIcon(name: string): string {
+  if (FOOD_ICONS[name]) return FOOD_ICONS[name];
+  for (const [key, icon] of Object.entries(FOOD_ICONS)) {
+    if (name.includes(key) || key.includes(name)) return icon;
+  }
+  return "🥗";
+}
+
 export default function MobileAlertView() {
   const [activeTab, setActiveTab] = useState<AlertTab>("recommend");
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -98,8 +122,8 @@ export default function MobileAlertView() {
             ) : (
               keywords.map((kw) => (
                 <div key={kw.keyword} className="mobile-app-card">
-                  <div className="mobile-app-icon" style={{ background: "#E3F2FD", color: "#1565C0" }}>
-                    🔑
+                  <div className="mobile-app-icon" style={{ background: "#E8F5E9", color: "#2E7D32" }}>
+                    {getFoodIcon(kw.keyword)}
                   </div>
                   <div className="mobile-app-card-info">
                     <strong>{kw.keyword}</strong>
