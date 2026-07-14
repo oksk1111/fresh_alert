@@ -1,3 +1,6 @@
 {
-  "version": 2
+  "version": 2,
+  "env": {
+    "VITE_API_BASE_URL": "http://134.185.117.248:8000"
+  }
 }
