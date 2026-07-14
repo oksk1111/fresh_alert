@@ -60,8 +60,8 @@ export default function App() {
       <header className="announcement-bar">
         <span>농가 폐기 0원 수렴을 위한 실시간 수급 오케스트레이션 테스트베드 운영 중</span>
         <nav>
-          <a href="#dashboard">B2B 대시보드</a>
           <a href="#fresh-alert">FreshAlert</a>
+          <a href="#dashboard">B2B 대시보드</a>
           <a href="#mobile">모바일 UX</a>
         </nav>
       </header>
@@ -78,6 +78,8 @@ export default function App() {
       </div>
 
       <main className="container">
+        <FreshAlertSection />
+
         <section className="hero">
           <article>
             <h1>
@@ -189,8 +191,6 @@ export default function App() {
             )}
           </article>
         </section>
-
-        <FreshAlertSection />
 
         <section className="feature-section" id="mobile">
           <h2>모듈 시스템 맵</h2>
