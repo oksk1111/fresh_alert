@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { BasketEnvelope, ForecastEnvelope, RouteEnvelope, fetchBasket, fetchForecasts, fetchRoute, issueToken } from "./api/client";
 import FreshAlertSection from "./components/FreshAlert";
+import MobileAlertView from "./components/MobileAlertView";
 
 function formatWon(value: number): string {
   return new Intl.NumberFormat("ko-KR").format(Math.round(value));
@@ -78,23 +79,7 @@ export default function App() {
       </div>
 
       <main className="container">
-        <section className="feature-section" id="mobile">
-          <h2>모듈 시스템 맵</h2>
-          <div className="feature-grid">
-            <div>
-              <h3>Data Ingestion</h3>
-              <p>Airflow 배치 시나리오를 기준으로 공공 데이터를 Feature Store에 동기화</p>
-            </div>
-            <div>
-              <h3>AI Orchestration</h3>
-              <p>TFT 예측과 다목적 추천함수를 결합해 사용자별 장바구니 생성</p>
-            </div>
-            <div>
-              <h3>Execution Layer</h3>
-              <p>동적 할인율, ESG 포인트, VRP 배차 결과를 API로 실시간 전달</p>
-            </div>
-          </div>
-        </section>
+        <MobileAlertView />
 
         <section className="hero">
           <article>
