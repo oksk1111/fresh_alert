@@ -1,6 +1,6 @@
 // PROD(Vercel): 빈 문자열 → 상대경로 → vercel.json rewrite가 백엔드로 프록시
-// DEV(로컬): 실제 백엔드 서버에서 데이터 불러오기
-const API_BASE = import.meta.env.PROD ? "" : "http://134.185.117.248:8000";
+// DEV(로컬): 로컬 백엔드 서버에서 데이터 불러오기
+const API_BASE = import.meta.env.PROD ? "" : "http://localhost:8000";
 
 export interface BasketItem {
   item_name: string;
