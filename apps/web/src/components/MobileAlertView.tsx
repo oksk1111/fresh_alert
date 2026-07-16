@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useGoogleLogin, googleLogout } from "@react-oauth/google";
 import { fetchNotifications, fetchKeywords, fetchRecommendations } from "../api/freshAlert";
 import type { Notification, KeywordSubscription, DailyRecommendation } from "../api/freshAlert";
+
+interface GoogleUser {
+  name: string;
+  email: string;
+  picture: string;
+}
 
 // ─── SVG 아이콘 (라인아트 벡터 스타일) ────────────────────────────────────────
 // icon_samples.jpg 참고: 깔끔한 라운드 라인 스트로크, fill 없음, 모노톤
@@ -126,6 +133,8 @@ interface CatalogEntry {
   category: string;
   avg_price: number;
   change_pct: number;
+  unit: string;
+  sale_date: string;
 }
 
 interface DetailTarget {
@@ -133,6 +142,8 @@ interface DetailTarget {
   category: string;
   price: number;
   changePct: number;
+  unit: string;
+  saleDate: string;
 }
 
 // ─── 가격 이력 모의(mock) 데이터 ────────────────────────────────────────────
@@ -226,6 +237,7 @@ function ItemRow({
   icon,
   name,
   category,
+  unit,
   price,
   changePct,
   rank,
@@ -235,6 +247,7 @@ function ItemRow({
   icon: string;
   name: string;
   category: string;
+  unit?: string;
   price: number;
   changePct: number;
   rank?: number;
@@ -255,7 +268,7 @@ function ItemRow({
       <div className="fa-item-icon">{icon}</div>
       <div className="fa-item-info">
         <strong>{name}</strong>
-        <small>{category}</small>
+        <small>{unit && unit !== "-" ? unit : category}</small>
       </div>
       <div className="fa-item-price">{price > 0 ? `${price.toLocaleString()}원` : "-"}</div>
       <div className={`fa-item-change${isUp ? " up" : isDown ? " down" : ""}`}>
@@ -282,6 +295,8 @@ export default function MobileAlertView() {
   const [overlay, setOverlay] = useState<Overlay>("none");
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [detailItem, setDetailItem] = useState<DetailTarget | null>(null);
+  const [googleUser, setGoogleUser] = useState<GoogleUser | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [keywords, setKeywords] = useState<KeywordSubscription[]>([]);
@@ -317,6 +332,29 @@ export default function MobileAlertView() {
     }
   }, []);
 
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setGoogleLoading(true);
+      try {
+        const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const data = await res.json();
+        setGoogleUser({ name: data.name, email: data.email, picture: data.picture });
+      } catch {
+        // ignore
+      } finally {
+        setGoogleLoading(false);
+      }
+    },
+    onError: () => setGoogleLoading(false),
+  });
+
+  const handleGoogleLogout = useCallback(() => {
+    googleLogout();
+    setGoogleUser(null);
+  }, []);
+
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
@@ -350,12 +388,13 @@ export default function MobileAlertView() {
     const map = new Map<string, CatalogEntry>();
     for (const n of notifications) {
       if (!map.has(n.item_name)) {
-        map.set(n.item_name, { category: n.category, avg_price: n.avg_price, change_pct: n.change_pct });
+        // notifications에 unit 필드가 없으므로 기본값 1kg 설정
+        map.set(n.item_name, { category: n.category, avg_price: n.avg_price, change_pct: n.change_pct, unit: "1kg", sale_date: n.sale_date });
       }
     }
     for (const r of recommendations?.recommendations ?? []) {
       if (!map.has(r.item_name)) {
-        map.set(r.item_name, { category: r.category, avg_price: r.avg_price, change_pct: 0 });
+        map.set(r.item_name, { category: r.category, avg_price: r.avg_price, change_pct: 0, unit: r.unit ?? "1kg", sale_date: r.sale_date ?? "" });
       }
     }
     return map;
@@ -363,24 +402,33 @@ export default function MobileAlertView() {
 
   // 관심 목록: 북마크된 품목명을 카탈로그에서 조회하여 구성한다.
   const interestItems = useMemo(() => {
+    // 추천 데이터에서 unit 정보 맵 구성 (notifications에는 unit이 없음)
+    const unitMap = new Map<string, string>();
+    for (const rec of recommendations?.recommendations ?? []) {
+      unitMap.set(rec.item_name, rec.unit ?? "-");
+    }
+
     return [...interestNames].map((name) => {
       const info = catalog.get(name);
+      const unit = unitMap.get(name) || (info?.unit ?? "-");
       return {
         name,
         category: info?.category ?? "-",
         avg_price: info?.avg_price ?? 0,
         change_pct: info?.change_pct ?? 0,
+        unit,
+        sale_date: info?.sale_date ?? "",
       };
     });
-  }, [interestNames, catalog]);
+  }, [interestNames, catalog, recommendations]);
 
   // 분류별 그룹핑 (상위 분류 → 하위 품목 목록)
   const categoryGroups = useMemo(() => {
-    const groups = new Map<string, { name: string; avg_price: number; change_pct: number }[]>();
+    const groups = new Map<string, { name: string; avg_price: number; change_pct: number; unit: string; sale_date: string }[]>();
     for (const [name, info] of catalog.entries()) {
       if (!info.category) continue;
       const arr = groups.get(info.category) ?? [];
-      arr.push({ name, avg_price: info.avg_price, change_pct: info.change_pct });
+      arr.push({ name, avg_price: info.avg_price, change_pct: info.change_pct, unit: info.unit, sale_date: info.sale_date });
       groups.set(info.category, arr);
     }
     return groups;
@@ -468,7 +516,22 @@ export default function MobileAlertView() {
     <div className="mobile-app">
       {/* [상단1 헤드]: 좌측 추천 티커 + 우측 검색/설정 아이콘 */}
       <header className="fa-head">
-        <div className="fa-ticker">
+        <button
+          className="fa-ticker"
+          onClick={() => {
+            const item = tickerItems[tickerIdx];
+            if (!item) return;
+            openDetail({
+              name: item.item_name,
+              category: item.category,
+              price: item.avg_price,
+              changePct: 0,
+              unit: item.unit ?? "-",
+              saleDate: item.sale_date ?? "",
+            });
+          }}
+          aria-label="추천 품목 상세 보기"
+        >
           {tickerItems.length > 0 ? (
             <div className="fa-ticker-track" key={tickerItems[tickerIdx]?.item_id ?? tickerIdx}>
               <span className="fa-ticker-icon">{getFoodIcon(tickerItems[tickerIdx].item_name)}</span>
@@ -478,7 +541,7 @@ export default function MobileAlertView() {
           ) : (
             <span className="fa-ticker-empty">추천 준비 중...</span>
           )}
-        </div>
+        </button>
         <div className="fa-head-icons">
           <button
             className={`fa-head-icon-btn${overlay === "search" ? " active" : ""}`}
@@ -520,24 +583,30 @@ export default function MobileAlertView() {
             )}
             {searchResults.length > 0 && (
               <div className="fa-list">
-                {searchResults.map((item) => (
-                  <ItemRow
-                    key={item.name}
-                    icon={getFoodIcon(item.name)}
-                    name={item.name}
-                    category={item.category}
-                    price={catalog.get(item.name)?.avg_price ?? 0}
-                    changePct={catalog.get(item.name)?.change_pct ?? 0}
-                    onSelect={() =>
-                      openDetail({
-                        name: item.name,
-                        category: item.category,
-                        price: catalog.get(item.name)?.avg_price ?? 0,
-                        changePct: catalog.get(item.name)?.change_pct ?? 0,
-                      })
-                    }
-                  />
-                ))}
+                {searchResults.map((item) => {
+                  const entry = catalog.get(item.name);
+                  return (
+                    <ItemRow
+                      key={item.name}
+                      icon={getFoodIcon(item.name)}
+                      name={item.name}
+                      category={item.category}
+                      unit={entry?.unit}
+                      price={entry?.avg_price ?? 0}
+                      changePct={entry?.change_pct ?? 0}
+                      onSelect={() =>
+                        openDetail({
+                          name: item.name,
+                          category: item.category,
+                          price: entry?.avg_price ?? 0,
+                          changePct: entry?.change_pct ?? 0,
+                          unit: entry?.unit ?? "-",
+                          saleDate: entry?.sale_date ?? "",
+                        })
+                      }
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -545,22 +614,64 @@ export default function MobileAlertView() {
 
         {overlay === "settings" && (
           <div className="fa-settings">
-            <div className="fa-settings-avatar"><IconUser size={34} /></div>
-            <strong className="fa-settings-name">user_dev_01</strong>
-            <div className="fa-settings-stats">
-              <div className="fa-settings-stat">
-                <b>{interestNames.size}</b>
-                <span>구독 키워드</span>
-              </div>
-              <div className="fa-settings-stat">
-                <b>{unreadCount}</b>
-                <span>읽지 않은 알림</span>
-              </div>
-              <div className="fa-settings-stat">
-                <b>{recommendations?.recommendations.length ?? 0}</b>
-                <span>오늘의 추천</span>
-              </div>
-            </div>
+            {googleUser ? (
+              <>
+                <div className="fa-settings-avatar fa-settings-avatar--photo">
+                  <img src={googleUser.picture} alt={googleUser.name} className="fa-settings-photo" />
+                </div>
+                <strong className="fa-settings-name">{googleUser.name}</strong>
+                <span className="fa-settings-email">{googleUser.email}</span>
+                <div className="fa-settings-stats">
+                  <div className="fa-settings-stat">
+                    <b>{interestNames.size}</b>
+                    <span>구독 키워드</span>
+                  </div>
+                  <div className="fa-settings-stat">
+                    <b>{unreadCount}</b>
+                    <span>읽지 않은 알림</span>
+                  </div>
+                  <div className="fa-settings-stat">
+                    <b>{recommendations?.recommendations.length ?? 0}</b>
+                    <span>오늘의 추천</span>
+                  </div>
+                </div>
+                <button className="fa-logout-btn" onClick={handleGoogleLogout}>
+                  로그아웃
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="fa-settings-avatar"><IconUser size={34} /></div>
+                <strong className="fa-settings-name">로그인이 필요합니다</strong>
+                <div className="fa-settings-stats">
+                  <div className="fa-settings-stat">
+                    <b>{interestNames.size}</b>
+                    <span>구독 키워드</span>
+                  </div>
+                  <div className="fa-settings-stat">
+                    <b>{unreadCount}</b>
+                    <span>읽지 않은 알림</span>
+                  </div>
+                  <div className="fa-settings-stat">
+                    <b>{recommendations?.recommendations.length ?? 0}</b>
+                    <span>오늘의 추천</span>
+                  </div>
+                </div>
+                <button
+                  className="fa-google-login-btn"
+                  onClick={() => { setGoogleLoading(true); googleLogin(); }}
+                  disabled={googleLoading}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  {googleLoading ? "로그인 중..." : "Google로 로그인"}
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -577,6 +688,7 @@ export default function MobileAlertView() {
                   icon={getFoodIcon(item.name)}
                   name={item.name}
                   category={item.category}
+                  unit={item.unit}
                   price={item.avg_price}
                   changePct={item.change_pct}
                   onSelect={() =>
@@ -585,6 +697,8 @@ export default function MobileAlertView() {
                       category: item.category,
                       price: item.avg_price,
                       changePct: item.change_pct,
+                      unit: item.unit,
+                      saleDate: item.sale_date,
                     })
                   }
                   bookmark={{
@@ -609,6 +723,7 @@ export default function MobileAlertView() {
                   icon={getFoodIcon(item.item_name)}
                   name={item.item_name}
                   category={item.category}
+                  unit={item.unit}
                   price={item.avg_price}
                   changePct={catalog.get(item.item_name)?.change_pct ?? 0}
                   onSelect={() =>
@@ -617,6 +732,8 @@ export default function MobileAlertView() {
                       category: item.category,
                       price: item.avg_price,
                       changePct: catalog.get(item.item_name)?.change_pct ?? 0,
+                      unit: item.unit ?? "-",
+                      saleDate: item.sale_date ?? "",
                     })
                   }
                   bookmark={{
@@ -654,6 +771,7 @@ export default function MobileAlertView() {
                           icon={getFoodIcon(it.name)}
                           name={it.name}
                           category={category}
+                          unit={it.unit}
                           price={it.avg_price}
                           changePct={it.change_pct}
                           onSelect={() =>
@@ -662,6 +780,8 @@ export default function MobileAlertView() {
                               category,
                               price: it.avg_price,
                               changePct: it.change_pct,
+                              unit: it.unit ?? "-",
+                              saleDate: it.sale_date ?? "",
                             })
                           }
                           bookmark={{
@@ -712,6 +832,9 @@ export default function MobileAlertView() {
               <span className="fa-detail-price">
                 {detailItem.price > 0 ? `${detailItem.price.toLocaleString()}원` : "-"}
               </span>
+              {detailItem.unit && detailItem.unit !== "-" && (
+                <span className="fa-detail-unit">/ {detailItem.unit}</span>
+              )}
               <span
                 className={`fa-detail-change${
                   detailItem.changePct > 0 ? " up" : detailItem.changePct < 0 ? " down" : ""
@@ -721,6 +844,25 @@ export default function MobileAlertView() {
                   ? `${detailItem.changePct > 0 ? "▲" : "▼"} ${Math.abs(detailItem.changePct)}%`
                   : "-"}
               </span>
+            </div>
+
+            <div className="fa-detail-meta-row">
+              <div className="fa-detail-meta-item">
+                <span className="fa-detail-meta-label">분류</span>
+                <span className="fa-detail-meta-value">{detailItem.category}</span>
+              </div>
+              {detailItem.unit && detailItem.unit !== "-" && (
+                <div className="fa-detail-meta-item">
+                  <span className="fa-detail-meta-label">단위</span>
+                  <span className="fa-detail-meta-value">{detailItem.unit}</span>
+                </div>
+              )}
+              {detailItem.saleDate && (
+                <div className="fa-detail-meta-item">
+                  <span className="fa-detail-meta-label">기준일</span>
+                  <span className="fa-detail-meta-value">{detailItem.saleDate}</span>
+                </div>
+              )}
             </div>
 
             <h3 className="fa-detail-section-title">최근 14일 가격 변화</h3>

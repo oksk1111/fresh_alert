@@ -10,6 +10,7 @@
     "lint": "echo \"No lint config yet\""
   },
   "dependencies": {
+    "@react-oauth/google": "^0.13.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -23,11 +24,11 @@
     "vite": "^5.4.10"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "4.61.1",
-    "@rollup/rollup-linux-x64-musl": "4.61.1",
-    "@rollup/rollup-linux-arm64-gnu": "4.61.1",
     "@rollup/rollup-darwin-arm64": "4.61.1",
     "@rollup/rollup-darwin-x64": "4.61.1",
+    "@rollup/rollup-linux-arm64-gnu": "4.61.1",
+    "@rollup/rollup-linux-x64-gnu": "4.61.1",
+    "@rollup/rollup-linux-x64-musl": "4.61.1",
     "@rollup/rollup-win32-x64-msvc": "4.61.1"
   }
 }

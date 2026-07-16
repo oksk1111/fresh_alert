@@ -1,6 +1,6 @@
 // PROD(Vercel): 빈 문자열 → 상대경로 → vercel.json rewrite가 백엔드로 프록시
-// DEV(로컬): 로컬 백엔드 서버에서 데이터 불러오기
-const API_BASE = import.meta.env.PROD ? "" : "http://localhost:8000";
+// DEV(로컬): VITE_API_BASE_URL 환경변수 사용 (미설정 시 localhost:8000 fallback)
+const API_BASE = import.meta.env.PROD ? "" : (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000");
 const FA = `${API_BASE}/api/v1/fresh-alert`;
 
 export interface RecommendationItem {
@@ -65,7 +65,7 @@ export const fetchKeywords = (userId = "user_dev_01"): Promise<KeywordSubscripti
 
 export const fetchNotifications = (userId = "user_dev_01"): Promise<Notification[]> =>
   get<{ user_id: string; total: number; notifications: Notification[] }>(
-    `${FA}/notifications?user_id=${userId}&limit=20`
+    `${FA}/notifications?user_id=${userId}&limit=100`
   ).then((d) => d.notifications);
 
 export const fetchCurrentSeason = (): Promise<SeasonInfo> =>
