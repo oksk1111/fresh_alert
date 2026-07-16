@@ -2,13 +2,85 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchNotifications, fetchKeywords, fetchRecommendations } from "../api/freshAlert";
 import type { Notification, KeywordSubscription, DailyRecommendation } from "../api/freshAlert";
 
+// ─── SVG 아이콘 (라인아트 벡터 스타일) ────────────────────────────────────────
+// icon_samples.jpg 참고: 깔끔한 라운드 라인 스트로크, fill 없음, 모노톤
+
+function IconSearch({ size = 20, stroke = "currentColor" }: { size?: number; stroke?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <line x1="16.65" y1="16.65" x2="21" y2="21" />
+    </svg>
+  );
+}
+
+function IconSettings({ size = 20, stroke = "currentColor" }: { size?: number; stroke?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z" />
+    </svg>
+  );
+}
+
+function IconStar({ size = 22, stroke = "currentColor", filled = false }: { size?: number; stroke?: string; filled?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? stroke : "none"} stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}
+
+function IconTarget({ size = 22, stroke = "currentColor" }: { size?: number; stroke?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  );
+}
+
+function IconFolder({ size = 22, stroke = "currentColor" }: { size?: number; stroke?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function IconBookmark({ size = 18, stroke = "currentColor", filled = false }: { size?: number; stroke?: string; filled?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? stroke : "none"} stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function IconUser({ size = 34, stroke = "currentColor" }: { size?: number; stroke?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function IconChevronLeft({ size = 20, stroke = "currentColor" }: { size?: number; stroke?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
 type MenuTab = "interest" | "recommend" | "category";
 type Overlay = "none" | "search" | "settings";
 
-const MENU_CONFIG: { key: MenuTab; label: string; icon: string }[] = [
-  { key: "interest", label: "관심", icon: "⭐" },
-  { key: "recommend", label: "추천", icon: "🎯" },
-  { key: "category", label: "분류", icon: "📂" },
+const MENU_CONFIG: { key: MenuTab; label: string; icon: JSX.Element }[] = [
+  { key: "interest", label: "관심", icon: <IconStar size={22} /> },
+  { key: "recommend", label: "추천", icon: <IconTarget size={22} /> },
+  { key: "category", label: "분류", icon: <IconFolder size={22} /> },
 ];
 
 // 공지/광고 데이터 소스가 아직 없어 비워 둔다 (목업). 값이 채워지면 알림바가 자동으로 표시된다.
@@ -198,7 +270,7 @@ function ItemRow({
           }}
           aria-label={bookmark.enabled ? "관심 해제" : "관심 등록"}
         >
-          🔖
+          <IconBookmark size={16} filled={bookmark.enabled} />
         </button>
       )}
     </div>
@@ -413,14 +485,14 @@ export default function MobileAlertView() {
             onClick={() => toggleOverlay("search")}
             aria-label="검색"
           >
-            🔍
+            <IconSearch size={20} />
           </button>
           <button
             className={`fa-head-icon-btn${overlay === "settings" ? " active" : ""}`}
             onClick={() => toggleOverlay("settings")}
             aria-label="설정"
           >
-            ⚙️
+            <IconSettings size={20} />
           </button>
         </div>
       </header>
@@ -473,7 +545,7 @@ export default function MobileAlertView() {
 
         {overlay === "settings" && (
           <div className="fa-settings">
-            <div className="fa-settings-avatar">👤</div>
+            <div className="fa-settings-avatar"><IconUser size={34} /></div>
             <strong className="fa-settings-name">user_dev_01</strong>
             <div className="fa-settings-stats">
               <div className="fa-settings-stat">
@@ -626,7 +698,7 @@ export default function MobileAlertView() {
         <div className="fa-detail-screen">
           <header className="fa-detail-header">
             <button className="fa-detail-back" onClick={() => setDetailItem(null)} aria-label="뒤로가기">
-              ‹
+              <IconChevronLeft size={20} />
             </button>
             <span className="fa-detail-icon">{getFoodIcon(detailItem.name)}</span>
             <div className="fa-detail-title">
