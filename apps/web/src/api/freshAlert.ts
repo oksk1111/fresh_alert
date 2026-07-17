@@ -56,8 +56,14 @@ async function get<T>(path: string): Promise<T> {
   return json.data ?? json;
 }
 
-export const fetchRecommendations = (): Promise<DailyRecommendation> =>
-  get(`${FA}/recommendations/today`);
+// top=10: 추천 탭용 상위 10개 (가격변동 큰 순)
+// top=0 (생략): 분류 탭용 전체 목록
+export const fetchRecommendations = (top = 0): Promise<DailyRecommendation> =>
+  get(`${FA}/recommendations/today${top > 0 ? `?top=${top}` : ""}`);
+
+// 분류 탭 전용 — 전체 품목 목록
+export const fetchAllItems = (): Promise<DailyRecommendation> =>
+  fetchRecommendations(0);
 
 export const fetchKeywords = (userId = "user_dev_01"): Promise<KeywordSubscription[]> =>
   get<{ user_id: string; keywords: KeywordSubscription[] }>(`${FA}/keywords?user_id=${userId}`)

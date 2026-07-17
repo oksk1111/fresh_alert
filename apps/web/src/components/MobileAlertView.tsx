@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useGoogleLogin, googleLogout } from "@react-oauth/google";
-import { fetchNotifications, fetchKeywords, fetchRecommendations } from "../api/freshAlert";
+import { fetchNotifications, fetchKeywords, fetchRecommendations, fetchAllItems } from "../api/freshAlert";
 import type { Notification, KeywordSubscription, DailyRecommendation } from "../api/freshAlert";
 
 interface GoogleUser {
@@ -200,33 +200,73 @@ function PriceHistoryChart({ data }: { data: { date: string; price: number }[] }
     return <p className="fa-empty">가격 이력이 없습니다</p>;
   }
 
-  const width = 320;
-  const height = 140;
-  const padding = 10;
-  const prices = data.map((d) => d.price);
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const range = max - min || 1;
-  const stepX = data.length > 1 ? (width - padding * 2) / (data.length - 1) : 0;
+  const chartW = 300;
+  const chartH = 120;
+  const padLeft = 56;  // Y축 레이블 공간
+  const padRight = 8;
+  const padTop = 8;
+  const padBottom = 28; // X축 레이블 공간
+  const svgW = padLeft + chartW + padRight;
+  const svgH = padTop + chartH + padBottom;
 
-  const points = data.map((d, i) => {
-    const x = padding + i * stepX;
-    const y = padding + (height - padding * 2) * (1 - (d.price - min) / range);
-    return `${x},${y}`;
-  });
-  const linePoints = points.join(" ");
-  const areaPoints = `${padding},${height - padding} ${linePoints} ${width - padding},${height - padding}`;
+  const prices = data.map((d) => d.price);
+  const minP = Math.min(...prices);
+  const maxP = Math.max(...prices);
+  const range = maxP - minP || 1;
+  const stepX = data.length > 1 ? chartW / (data.length - 1) : 0;
+
+  const px = (i: number) => padLeft + i * stepX;
+  const py = (p: number) => padTop + chartH * (1 - (p - minP) / range);
+
+  const linePoints = data.map((d, i) => `${px(i)},${py(d.price)}`).join(" ");
+  const areaPoints = `${px(0)},${padTop + chartH} ${linePoints} ${px(data.length - 1)},${padTop + chartH}`;
+
+  // Y축: 최소/중간/최대 3개 레이블
+  const mid = Math.round((minP + maxP) / 2);
+  const yLabels = [
+    { val: maxP, y: py(maxP) },
+    { val: mid,  y: py(mid) },
+    { val: minP, y: py(minP) },
+  ];
+
+  // X축: 첫/중간/마지막 날짜
+  const midIdx = Math.floor((data.length - 1) / 2);
+  const xLabels = [
+    { text: data[0].date, x: px(0) },
+    { text: data[midIdx].date, x: px(midIdx) },
+    { text: data[data.length - 1].date, x: px(data.length - 1) },
+  ];
+
+  const fmt = (v: number) =>
+    v >= 10000 ? `${(v / 10000).toFixed(1)}만` : v.toLocaleString();
 
   return (
     <div className="fa-chart">
-      <svg viewBox={`0 0 ${width} ${height}`} className="fa-chart-svg" preserveAspectRatio="none">
+      <svg viewBox={`0 0 ${svgW} ${svgH}`} className="fa-chart-svg" style={{ width: "100%", height: "auto" }}>
+        {/* Y축 그리드 + 레이블 */}
+        {yLabels.map(({ val, y }) => (
+          <g key={val}>
+            <line x1={padLeft} y1={y} x2={padLeft + chartW} y2={y}
+              stroke="var(--fa-chart-grid, #e5e7eb)" strokeWidth="0.5" strokeDasharray="3,3" />
+            <text x={padLeft - 4} y={y + 4} textAnchor="end"
+              fontSize="9" fill="var(--fa-chart-label, #9ca3af)">{fmt(val)}</text>
+          </g>
+        ))}
+        {/* 영역 채우기 */}
         <polygon points={areaPoints} className="fa-chart-area" />
+        {/* 라인 */}
         <polyline points={linePoints} className="fa-chart-line" />
+        {/* 데이터 포인트 */}
+        {data.map((d, i) => (
+          <circle key={i} cx={px(i)} cy={py(d.price)} r="2.5"
+            fill="var(--fa-chart-dot, #10b981)" />
+        ))}
+        {/* X축 레이블 */}
+        {xLabels.map(({ text, x }) => (
+          <text key={text} x={x} y={padTop + chartH + 18} textAnchor="middle"
+            fontSize="9" fill="var(--fa-chart-label, #9ca3af)">{text}</text>
+        ))}
       </svg>
-      <div className="fa-chart-labels">
-        <span>{data[0].date}</span>
-        <span>{data[data.length - 1].date}</span>
-      </div>
     </div>
   );
 }
@@ -300,7 +340,10 @@ export default function MobileAlertView() {
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [keywords, setKeywords] = useState<KeywordSubscription[]>([]);
+  // recommendations: 전체 품목 (분류 탭 + catalog 공용)
   const [recommendations, setRecommendations] = useState<DailyRecommendation | null>(null);
+  // topRecommendations: 가격변동 상위 10개 (추천 탭 전용)
+  const [topRecommendations, setTopRecommendations] = useState<DailyRecommendation | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -317,14 +360,16 @@ export default function MobileAlertView() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [notifs, kws, recs] = await Promise.all([
+      const [notifs, kws, allRecs, topRecs] = await Promise.all([
         fetchNotifications(),
         fetchKeywords(),
-        fetchRecommendations(),
+        fetchAllItems(),          // 전체 품목 (분류 탭)
+        fetchRecommendations(10), // 가격변동 상위 10개 (추천 탭)
       ]);
       setNotifications(notifs);
       setKeywords(kws);
-      setRecommendations(recs);
+      setRecommendations(allRecs);
+      setTopRecommendations(topRecs);
     } catch {
       // silently handle
     } finally {
@@ -373,7 +418,7 @@ export default function MobileAlertView() {
   }, [detailItem, priceAlerts]);
 
   // 상단 헤드 좌측 추천 티커: 2초마다 다음 추천 품목으로 스크롤 전환.
-  const tickerItems = recommendations?.recommendations ?? [];
+  const tickerItems = topRecommendations?.recommendations ?? [];
   useEffect(() => {
     if (tickerItems.length === 0) return;
     setTickerIdx(0);
@@ -631,7 +676,7 @@ export default function MobileAlertView() {
                     <span>읽지 않은 알림</span>
                   </div>
                   <div className="fa-settings-stat">
-                    <b>{recommendations?.recommendations.length ?? 0}</b>
+                    <b>{topRecommendations?.recommendations.length ?? 0}</b>
                     <span>오늘의 추천</span>
                   </div>
                 </div>
@@ -653,7 +698,7 @@ export default function MobileAlertView() {
                     <span>읽지 않은 알림</span>
                   </div>
                   <div className="fa-settings-stat">
-                    <b>{recommendations?.recommendations.length ?? 0}</b>
+                    <b>{topRecommendations?.recommendations.length ?? 0}</b>
                     <span>오늘의 추천</span>
                   </div>
                 </div>
@@ -712,11 +757,11 @@ export default function MobileAlertView() {
         )}
 
         {overlay === "none" && !loading && menuTab === "recommend" && (
-          !recommendations || recommendations.recommendations.length === 0 ? (
+          !topRecommendations || topRecommendations.recommendations.length === 0 ? (
             <p className="fa-empty">추천 데이터가 없습니다</p>
           ) : (
             <div className="fa-list">
-              {recommendations.recommendations.map((item, idx) => (
+              {topRecommendations.recommendations.map((item, idx) => (
                 <ItemRow
                   key={item.item_id}
                   rank={idx + 1}
