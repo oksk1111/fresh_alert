@@ -49,8 +49,10 @@ export interface SeasonInfo {
   items: SeasonItem[];
 }
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(path);
+async function get<T>(path: string, token?: string): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(path, { headers });
   if (!res.ok) throw new Error(`${res.status}`);
   const json = await res.json();
   return json.data ?? json;
@@ -65,14 +67,46 @@ export const fetchRecommendations = (top = 0): Promise<DailyRecommendation> =>
 export const fetchAllItems = (): Promise<DailyRecommendation> =>
   fetchRecommendations(0);
 
-export const fetchKeywords = (userId = "user_dev_01"): Promise<KeywordSubscription[]> =>
-  get<{ user_id: string; keywords: KeywordSubscription[] }>(`${FA}/keywords?user_id=${userId}`)
+export const fetchKeywords = (token?: string): Promise<KeywordSubscription[]> =>
+  get<{ user_id: string; keywords: KeywordSubscription[] }>(`${FA}/keywords`, token)
     .then((d) => d.keywords);
 
-export const fetchNotifications = (userId = "user_dev_01"): Promise<Notification[]> =>
+export const fetchNotifications = (token?: string): Promise<Notification[]> =>
   get<{ user_id: string; total: number; notifications: Notification[] }>(
-    `${FA}/notifications?user_id=${userId}&limit=100`
+    `${FA}/notifications?limit=100`,
+    token,
   ).then((d) => d.notifications);
+
+export const addKeyword = (token: string, keyword: string): Promise<void> =>
+  fetch(`${FA}/keywords?keyword=${encodeURIComponent(keyword)}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  }).then(() => undefined);
+
+export const removeKeyword = (token: string, keyword: string): Promise<void> =>
+  fetch(`${FA}/keywords/${encodeURIComponent(keyword)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  }).then(() => undefined);
 
 export const fetchCurrentSeason = (): Promise<SeasonInfo> =>
   get(`${FA}/seasons/current`);
+
+export interface AuthUser {
+  id: number;
+  email: string;
+  name: string;
+  profile_image: string;
+  role: string;
+}
+
+export async function loginWithGoogle(idToken: string): Promise<{ access_token: string; user: AuthUser }> {
+  const res = await fetch(`${API_BASE}/api/v1/auth/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id_token: idToken }),
+  });
+  if (!res.ok) throw new Error(`Auth error: ${res.status}`);
+  const json = await res.json();
+  return json.data;
+}

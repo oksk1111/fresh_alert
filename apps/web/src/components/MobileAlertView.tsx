@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useGoogleLogin, googleLogout } from "@react-oauth/google";
-import { fetchNotifications, fetchKeywords, fetchRecommendations, fetchAllItems } from "../api/freshAlert";
+import { GoogleLogin, googleLogout } from "@react-oauth/google";
+import { fetchNotifications, fetchKeywords, fetchRecommendations, fetchAllItems, loginWithGoogle, addKeyword, removeKeyword } from "../api/freshAlert";
 import type { Notification, KeywordSubscription, DailyRecommendation } from "../api/freshAlert";
 
 interface GoogleUser {
@@ -337,6 +337,7 @@ export default function MobileAlertView() {
   const [detailItem, setDetailItem] = useState<DetailTarget | null>(null);
   const [googleUser, setGoogleUser] = useState<GoogleUser | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [keywords, setKeywords] = useState<KeywordSubscription[]>([]);
@@ -358,16 +359,12 @@ export default function MobileAlertView() {
   const [priceAlerts, setPriceAlerts] = useState<Record<string, number>>({});
   const [alertInput, setAlertInput] = useState("");
 
-  const fetchData = useCallback(async () => {
+  const fetchPublicData = useCallback(async () => {
     try {
-      const [notifs, kws, allRecs, topRecs] = await Promise.all([
-        fetchNotifications(),
-        fetchKeywords(),
-        fetchAllItems(),          // 전체 품목 (분류 탭)
-        fetchRecommendations(10), // 가격변동 상위 10개 (추천 탭)
+      const [allRecs, topRecs] = await Promise.all([
+        fetchAllItems(),
+        fetchRecommendations(10),
       ]);
-      setNotifications(notifs);
-      setKeywords(kws);
       setRecommendations(allRecs);
       setTopRecommendations(topRecs);
     } catch {
@@ -377,32 +374,47 @@ export default function MobileAlertView() {
     }
   }, []);
 
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setGoogleLoading(true);
-      try {
-        const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        const data = await res.json();
-        setGoogleUser({ name: data.name, email: data.email, picture: data.picture });
-      } catch {
-        // ignore
-      } finally {
-        setGoogleLoading(false);
-      }
-    },
-    onError: () => setGoogleLoading(false),
-  });
+  const fetchUserData = useCallback(async (token: string) => {
+    try {
+      const [notifs, kws] = await Promise.all([
+        fetchNotifications(token),
+        fetchKeywords(token),
+      ]);
+      setNotifications(notifs);
+      setKeywords(kws);
+    } catch {
+      // silently handle
+    }
+  }, []);
+
+  const handleGoogleSuccess = useCallback(async (credentialResponse: { credential?: string }) => {
+    const idToken = credentialResponse.credential;
+    if (!idToken) return;
+    setGoogleLoading(true);
+    try {
+      const { access_token, user } = await loginWithGoogle(idToken);
+      setAuthToken(access_token);
+      setGoogleUser({ name: user.name, email: user.email, picture: user.profile_image });
+      await fetchUserData(access_token);
+    } catch {
+      // ignore
+    } finally {
+      setGoogleLoading(false);
+    }
+  }, [fetchUserData]);
 
   const handleGoogleLogout = useCallback(() => {
     googleLogout();
     setGoogleUser(null);
+    setAuthToken(null);
+    setNotifications([]);
+    setKeywords([]);
+    setInterestNames(new Set());
   }, []);
 
   useEffect(() => {
-    void fetchData();
-  }, [fetchData]);
+    void fetchPublicData();
+  }, [fetchPublicData]);
 
   useEffect(() => {
     setInterestNames(new Set(keywords.map((kw) => kw.keyword)));
@@ -524,12 +536,14 @@ export default function MobileAlertView() {
       const next = new Set(prev);
       if (next.has(name)) {
         next.delete(name);
+        if (authToken) void removeKeyword(authToken, name);
       } else {
         next.add(name);
+        if (authToken) void addKeyword(authToken, name);
       }
       return next;
     });
-  }, []);
+  }, [authToken]);
 
   const openDetail = useCallback((target: DetailTarget) => {
     setDetailItem(target);
@@ -702,19 +716,15 @@ export default function MobileAlertView() {
                     <span>오늘의 추천</span>
                   </div>
                 </div>
-                <button
-                  className="fa-google-login-btn"
-                  onClick={() => { setGoogleLoading(true); googleLogin(); }}
-                  disabled={googleLoading}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  {googleLoading ? "로그인 중..." : "Google로 로그인"}
-                </button>
+                {googleLoading ? (
+                  <p className="fa-empty">로그인 중...</p>
+                ) : (
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={() => setGoogleLoading(false)}
+                    text="signin_with"
+                  />
+                )}
               </>
             )}
           </div>
